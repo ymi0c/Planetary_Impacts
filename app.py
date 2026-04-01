@@ -68,10 +68,35 @@ color_map = {
 # --- 3. DATA FETCHING FUNCTIONS ---
 def get_metrics():
     with driver.session() as session:
-        sys = session.run("MATCH (n:EarthSystem) WHERE n.status IS NULL OR n.status = 'approved' RETURN count(n)").single()[0]
-        drv = session.run("MATCH (n:Driver) WHERE n.status IS NULL OR n.status = 'approved' RETURN count(n)").single()[0]
-        imp = session.run("MATCH (n:Impact) WHERE n.status IS NULL OR n.status = 'approved' RETURN count(n)").single()[0]
-        mit = session.run("MATCH ()-[r:MITIGATES]->() WHERE r.status IS NULL OR r.status = 'approved' RETURN count(r)").single()[0]
+        # Resilient counters: Checks both native Neo4j labels and CSV-imported property labels
+        sys = session.run("""
+            MATCH (n) 
+            WHERE (n.status IS NULL OR n.status = 'approved') 
+              AND ('EarthSystem' IN labels(n) OR n.node_label = 'EarthSystem' OR n.node_label = 'Earth System') 
+            RETURN count(n)
+        """).single()[0]
+        
+        drv = session.run("""
+            MATCH (n) 
+            WHERE (n.status IS NULL OR n.status = 'approved') 
+              AND ('Driver' IN labels(n) OR n.node_label = 'Driver') 
+            RETURN count(n)
+        """).single()[0]
+        
+        imp = session.run("""
+            MATCH (n) 
+            WHERE (n.status IS NULL OR n.status = 'approved') 
+              AND ('Impact' IN labels(n) OR n.node_label = 'Impact') 
+            RETURN count(n)
+        """).single()[0]
+        
+        mit = session.run("""
+            MATCH ()-[r]->() 
+            WHERE (r.status IS NULL OR r.status = 'approved') 
+              AND (type(r) = 'MITIGATES' OR type(r) = 'Mitigates' OR toUpper(r.edge_type) = 'MITIGATES') 
+            RETURN count(r)
+        """).single()[0]
+        
         return sys, drv, imp, mit
 
 @st.cache_data(ttl=300)
